@@ -110,7 +110,7 @@ MIT License — See `LICENSE` file for details.
 
 ## Author
 
-Your Name — [j,e,haskell1998@gmail.com](mailto:j.e.haskell1998@gmail.com)
+James Haskell — [j.e.haskell1998@gmail.com](mailto:j.e.haskell1998@gmail.com)
 
 ---
 
