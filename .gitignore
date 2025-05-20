@@ -1,0 +1,27 @@
+# Build folders
+/build/
+/bin/
+/obj/
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Compiled objects
+*.o
+*.out
+*.a
+*.so
+
+# Editors
+*.swp
+*.swo
+*.user
+.idea/
+.vscode/
+
+# Logs
+*.log
+
