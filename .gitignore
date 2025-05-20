@@ -21,6 +21,7 @@ Makefile
 *.user
 .idea/
 .vscode/
+.vs/
 
 # Logs
 *.log
