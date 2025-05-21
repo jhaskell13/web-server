@@ -1,5 +1,6 @@
-#include "http.h"
-#include "mime.h"
+#include "../include/http.h"
+#include "../include/mime.h"
+#include "../include/http_request.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -121,50 +122,80 @@ void handle_client(int client_socket) {
         int bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
         if (bytes_received <= 0) break;
 
-        printf("Received:\n%s\n", buffer);
+        printf("Request Received\n\n");
 
-        // Get the first line (e.g., GET /hello HTTP 1.1)
-        char method[8], path[MAX_PATH_SIZE], protocol[16];
-
-        // Parse method, path, and protocol
-        if (sscanf(buffer, "%7s %1023s %15s", method, path, protocol) != 3) {
+        // NEW HTTP HANDLING
+        HttpRequest request;
+        if (parse_http_request(buffer, &request) < 0) {
             const char *bad_request = "HTTP/1.1 400 Bad Request\r\n\r\n";
             send(client_socket, bad_request, strlen(bad_request), 0);
             break;
         }
 
-        // Only allow GET
-        if (strcmp(method, "GET") != 0) {
-            const char *not_allowed = "HTTP/1.1 405 Method Not Allowed\r\n\r\n";
-            send(client_socket, not_allowed, strlen(not_allowed), 0);
-            break;
-        }
+        printf("Method: %s\n", request.method);
+        printf("Path: %s\n", request.path);
+        printf("Version: %s\n", request.http_version);
 
+        if (request.header_count > 0) {
+            printf("Headers: {\n");
+            for (int i = 0; i < request.header_count; i++) {
+                printf("\t%s: %s\n", request.headers[i].key, request.headers[i].value);
+            }
+            printf("}\n\n");
+        } else {
+            printf("Headers: {}\n\n");
+        }
+ 
         // Prevent backwards traversal
-        if (strstr(path, "..") != NULL) {
+        if (strstr(request.path, "..") != NULL) {
             const char *forbidden = "HTTP/1.1 403 Forbidden\r\n\r\n403 Forbidden";
             send(client_socket, forbidden, strlen(forbidden), 0);
             break;
         }
 
-        // DYNAMIC ROUTING
-        if (strcmp(path, "/") == 0) {
-            serve_template(client_socket, "templates/index.html",
-                    (char*[]){"title", "content"},
-                    (char*[]){"Home Page", "Welcome to the home page!"},
-                    2, keep_alive);
-            continue;
+        /*
+         * Dynamic Routing
+         *
+         * Classic HTTP request handling methods and routes.
+         * Can be used to serve a template or file, or update
+         * form data via POST. If the given path does not match
+         * a route, the server will attempt to open the path as
+         * a static file.
+         */
+
+        // GET
+        if (strcmp(request.method, "GET") == 0) {
+            if (strcmp(request.path, "/") == 0) {
+                serve_template(client_socket, "../templates/index.html",
+                        (char*[]){"title", "content"},
+                        (char*[]){"Home Page", "Welcome to the home page!"},
+                        2, keep_alive);
+                continue;
+            }
+        }
+        // POST..., etc.
+        else if (strcmp(request.method, "POST") == 0) {
+            // ...
+        }
+        else {
+
         }
 
-        // STATIC FILE SERVING
+        /*
+         * Static File Serving
+         *
+         * If no route matches the given request path, attempt
+         * to open a static file or directory listing.
+         */
+
         // Build static file path: ./static + path
         char full_path[MAX_PATH_SIZE];
 
         // Map requests for /assets and /static
-        if (strncmp(path, "/assets/", 8) == 0) {
-            snprintf(full_path, sizeof(full_path), "./assets/%.*s", MAX_PATH_SIZE - 10, path + 8);
+        if (strncmp(request.path, "/assets/", 8) == 0) {
+            snprintf(full_path, sizeof(full_path), "../assets/%.*s", MAX_PATH_SIZE - 11, request.path + 8);
         } else {
-            snprintf(full_path, sizeof(full_path), "./static%.*s", MAX_PATH_SIZE - 9, path);
+            snprintf(full_path, sizeof(full_path), "../static%.*s", MAX_PATH_SIZE - 10, request.path);
         }
 
         // Check if path is to a directory before trying to open file
@@ -180,7 +211,7 @@ void handle_client(int client_socket) {
             snprintf(index_path, sizeof(index_path), "%sindex.html", full_path);
             FILE *index_file = fopen(index_path, "rb");
             if (index_file) {
-                serve_file(index_file, index_path, client_socket, keep_alive, buffer, protocol);
+                serve_file(index_file, index_path, client_socket, keep_alive, buffer, request.http_version);
                 continue;
             }
 
@@ -200,17 +231,17 @@ void handle_client(int client_socket) {
                 "\r\n"
                 "<html><body><h1>Index of %s</h1><ul>",
                 keep_alive ? "keep-alive" : "close",
-                path);
+                request.path);
 
             struct dirent *entry;
             while ((entry = readdir(dir)) != NULL) {
                 if (strcmp(entry->d_name, ".") == 0) continue;
-                size_t line_size = strlen(path) + strlen(entry->d_name)*2 + 64;
+                size_t line_size = strlen(request.path) + strlen(entry->d_name)*2 + 64;
                 char *line = malloc(line_size);
                 snprintf(line, line_size,
                         "<li><a href=\"%s%s%s\">%s</a></li>",
-                        path,
-                        (path[strlen(path) - 1] == '/' ? "" : "/"),
+                        request.path,
+                        (request.path[strlen(request.path) - 1] == '/' ? "" : "/"),
                         entry->d_name,
                         entry->d_name);
                 strncat(response, line, sizeof(response) - strlen(response) - 1);
@@ -232,7 +263,7 @@ void handle_client(int client_socket) {
             return;
         }
 
-        serve_file(fp, full_path, client_socket, keep_alive, buffer, protocol);
+        serve_file(fp, full_path, client_socket, keep_alive, buffer, request.http_version);
     }
     close(client_socket);
 }

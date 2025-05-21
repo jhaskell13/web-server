@@ -8,8 +8,8 @@
 #include <sys/socket.h>
 #include <pthread.h>
 
-#include "http.h"
-#include "threadpool.h"
+#include "../include/http.h"
+#include "../include/threadpool.h"
 
 pthread_mutex_t thread_count_lock = PTHREAD_MUTEX_INITIALIZER;
 int active_threads = 0;

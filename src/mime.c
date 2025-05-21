@@ -1,4 +1,4 @@
-#include "mime.h"
+#include "../include/mime.h"
 
 #include <string.h>
 
