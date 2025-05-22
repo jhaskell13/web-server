@@ -11,6 +11,8 @@
 #include "../include/http.h"
 #include "../include/threadpool.h"
 
+#define SERVER_PORT 8080
+
 pthread_mutex_t thread_count_lock = PTHREAD_MUTEX_INITIALIZER;
 int active_threads = 0;
 
@@ -21,7 +23,7 @@ void *client_thread(void *arg) {
     pthread_mutex_unlock(&thread_count_lock);
 
     int client_socket = *(int *)arg;
-    free(arg);
+    free(arg); // malloc'ed in main()
     handle_client(client_socket);
 
     pthread_mutex_lock(&thread_count_lock);
@@ -46,7 +48,7 @@ int main() {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;  // Listen on all interfaces
-    server_addr.sin_port = htons(8080);        // Port 8080
+    server_addr.sin_port = htons(SERVER_PORT);
 
     if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("Bind failed");
@@ -61,7 +63,7 @@ int main() {
         return 1;
     }
 
-    printf("Server listening on port 8080...\n");
+    printf("Server listening on port %d...\n", SERVER_PORT);
 
     while (1) {
         // Accept a connection

@@ -124,7 +124,6 @@ void handle_client(int client_socket) {
 
         printf("Request Received\n\n");
 
-        // NEW HTTP HANDLING
         HttpRequest request;
         if (parse_http_request(buffer, &request) < 0) {
             const char *bad_request = "HTTP/1.1 400 Bad Request\r\n\r\n";
@@ -175,10 +174,27 @@ void handle_client(int client_socket) {
         }
         // POST..., etc.
         else if (strcmp(request.method, "POST") == 0) {
-            // ...
+            printf("POST body (%d bytes): %.*s\n", request.body_length, request.body_length, request.body);
+            if (strcmp(request.path, "/test-post") == 0) {
+                char response[1024];
+                char *response_body = "POST success";
+                int res_body_length = strlen(response_body);
+                snprintf(response, sizeof(response),
+                        "HTTP/1.1 200 OK\r\n"
+                        "Content-Type: text/plain\r\n"
+                        "Content-Length: %d\r\n"
+                        "Connection: %s\r\n"
+                        "\r\n"
+                        "%s",
+                        res_body_length, keep_alive ? "keep-alive" : "close", response_body);
+                send(client_socket, response, strlen(response), 0);
+                continue;
+            }
         }
         else {
-
+            char *response = "HTTP/1.1 400 BAD_REQUEST\r\n\r\n";
+            send(client_socket, response, strlen(response), 0);
+            continue;
         }
 
         /*

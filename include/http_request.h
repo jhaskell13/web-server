@@ -3,7 +3,7 @@
 
 #define MAX_HEADERS 20
 #define MAX_HEADER_KEY 64
-#define MAX_HEDER_VALUE 256
+#define MAX_HEADER_VALUE 256
 
 typedef struct {
     char method[8];
@@ -11,9 +11,11 @@ typedef struct {
     char http_version[16];
     struct {
         char key[MAX_HEADER_KEY];
-        char value[MAX_HEDER_VALUE];
+        char value[MAX_HEADER_VALUE];
     } headers[MAX_HEADERS];
     int header_count;
+    const char *body;
+    int body_length;
 } HttpRequest;
 
 int parse_http_request(const char *raw, HttpRequest *request);
