@@ -1,13 +1,14 @@
-#include "../include/http.h"
-#include "../include/mime.h"
-#include "../include/http_request.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
 #include <dirent.h>
+
+#include "../include/http.h"
+#include "../include/mime.h"
+#include "../include/http_request.h"
+#include "../include/http_response.h"
 
 #define BUFFER_SIZE 2048
 #define MAX_PATH_SIZE 1024
@@ -49,6 +50,7 @@ void serve_template(int client_socket, const char *full_path, char **keys, char 
         send(client_socket, not_found, strlen(not_found), 0);
         return;
     }
+
     // Get file size and read into buffer fb
     fseek(fp, 0, SEEK_END);
     long file_size = ftell(fp);
@@ -68,7 +70,7 @@ void serve_template(int client_socket, const char *full_path, char **keys, char 
             int i = 0;
             p += 2;
 
-            // Loop until we detect "}}" marking the end of interpolation
+            // Loop until we detect "}}" 
             while (*p && !(*p == '}' && *(p+1) == '}') && i < sizeof(key) - 1) {
                 key[i++] = *p++;
             }
@@ -90,17 +92,9 @@ void serve_template(int client_socket, const char *full_path, char **keys, char 
         }
     }
 
-    char header[256];
-    snprintf(header, sizeof(header),
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
-            "Content-Length: %lu\r\n"
-            "Connection: %s\r\n"
-            "\r\n",
-            strlen(output), keep_alive ? "keep-alive" : "close");
-
-    send(client_socket, header, strlen(header), 0);
-    send(client_socket, output, strlen(output), 0);
+    HttpResponse response = {http_response_status(OK), get_mime_type(full_path), strlen(output), keep_alive ? "keep-alive" : "close", output};
+    send_response(&response, client_socket);
+    
     free(fb);
     free(output);
 }
@@ -172,28 +166,19 @@ void handle_client(int client_socket) {
                 continue;
             }
         }
-        // POST..., etc.
+        // POST
         else if (strcmp(request.method, "POST") == 0) {
             printf("POST body (%d bytes): %.*s\n", request.body_length, request.body_length, request.body);
             if (strcmp(request.path, "/test-post") == 0) {
-                char response[1024];
-                char *response_body = "POST success";
-                int res_body_length = strlen(response_body);
-                snprintf(response, sizeof(response),
-                        "HTTP/1.1 200 OK\r\n"
-                        "Content-Type: text/plain\r\n"
-                        "Content-Length: %d\r\n"
-                        "Connection: %s\r\n"
-                        "\r\n"
-                        "%s",
-                        res_body_length, keep_alive ? "keep-alive" : "close", response_body);
-                send(client_socket, response, strlen(response), 0);
+                char *response_body = "POST Success.\r\n";
+                HttpResponse response = {http_response_status(OK), "text/plain", strlen(response_body), keep_alive ? "keep-alive" : "close", response_body};
+                send_response(&response, client_socket);
                 continue;
             }
         }
         else {
-            char *response = "HTTP/1.1 400 BAD_REQUEST\r\n\r\n";
-            send(client_socket, response, strlen(response), 0);
+            HttpResponse response = {http_response_status(BAD_REQUEST), "text/plain", 0, keep_alive ? "keep-alive" : "close", NULL};
+            send_response(&response, client_socket);
             continue;
         }
 
